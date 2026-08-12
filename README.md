@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Tuition Management System (TMS)
 
 A production-grade, highly responsive Tuition Management System (TMS) designed for teachers and academy administrators. Built on a modern full-stack architecture featuring a Next.js App Router frontend and a FastAPI backend with asynchronous database querying.
