@@ -1,0 +1,229 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema, LoginInput } from "@/lib/validators/auth";
+import { useAuth } from "@/lib/auth/auth-context";
+
+export default function LoginPage() {
+  const { login, loading } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (data: LoginInput) => {
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      await login(data);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      const msg =
+        (typeof detail === "object" ? detail?.message : detail) ||
+        e?.response?.data?.message ||
+        "Invalid email or password.";
+      setFormError(typeof msg === "string" ? msg : "Invalid email or password.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-5xl rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/90 shadow-2xl backdrop-blur-xl grid grid-cols-1 lg:grid-cols-12 min-h-[620px]">
+      {/* Left Column — Education Branding & Showcase */}
+      <div className="lg:col-span-5 p-8 lg:p-12 flex flex-col justify-between relative bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 border-r border-slate-800/80">
+        {/* Glow backdrop */}
+        <div className="absolute top-0 left-0 w-full h-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 space-y-6">
+          {/* Logo / Brand Header */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/30 text-white font-extrabold">
+              🎓
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
+                Excellence Tuition Classes
+              </h1>
+              <p className="text-xs text-indigo-300 font-medium">Academy Management Suite</p>
+            </div>
+          </div>
+
+          <div className="pt-6 space-y-3">
+            <span className="inline-block px-3 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+              ⚡ Single Teacher Admin Portal
+            </span>
+            <h2 className="text-2xl font-bold text-white leading-snug">
+              Smart tuition management built for modern educators.
+            </h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Effortlessly track student attendance, generate instant digital receipts, share WhatsApp payment confirmations with parents, and evaluate academic performance.
+            </p>
+          </div>
+        </div>
+
+        {/* Feature Highlights */}
+        <div className="relative z-10 pt-8 space-y-3 border-t border-indigo-500/20">
+          {[
+            { icon: "📄", text: "Instant A4 Digital PDF Receipts" },
+            { icon: "💬", text: "Free WhatsApp Parent Click-to-Chat" },
+            { icon: "📊", text: "Real-time Fee Collection Analytics" },
+          ].map((item, idx) => (
+            <div key={idx} className="flex items-center gap-3 text-xs text-indigo-200">
+              <span className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-sm">
+                {item.icon}
+              </span>
+              <span>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right Column — Login Form */}
+      <div className="lg:col-span-7 p-8 lg:p-12 flex flex-col justify-center bg-slate-900/60">
+        <div className="max-w-md w-full mx-auto space-y-6">
+          <div>
+            <h3 className="text-2xl font-bold text-white tracking-tight">Teacher Portal Login</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Enter your credentials to manage your tuition academy.
+            </p>
+          </div>
+
+          {formError && (
+            <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-medium flex items-center justify-between animate-in fade-in duration-200">
+              <span>⚠️ {formError}</span>
+              <button
+                onClick={() => setFormError(null)}
+                className="text-red-400 hover:text-red-200 text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-xs font-semibold text-slate-300">
+                Email Address
+              </label>
+              <div className="relative">
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  {...register("email")}
+                  className={`w-full rounded-xl border px-4 py-3 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30 bg-slate-950/70 text-slate-100 placeholder-slate-500 ${
+                    errors.email
+                      ? "border-red-500 focus:ring-red-500/30"
+                      : "border-slate-800 focus:border-indigo-500"
+                  }`}
+                  placeholder="teacher@excellence.com"
+                />
+              </div>
+              {errors.email && (
+                <p className="text-xs text-red-400 font-medium">{errors.email.message}</p>
+              )}
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-xs font-semibold text-slate-300">
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...register("password")}
+                  className={`w-full rounded-xl border px-4 py-3 pr-10 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/30 bg-slate-950/70 text-slate-100 placeholder-slate-500 ${
+                    errors.password
+                      ? "border-red-500 focus:ring-red-500/30"
+                      : "border-slate-800 focus:border-indigo-500"
+                  }`}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-xs text-red-400 font-medium">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500/20"
+                />
+                <span>Remember me for 30 days</span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={submitting || loading}
+              className="w-full py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {submitting || loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <span>Sign in to Dashboard</span>
+              )}
+            </button>
+          </form>
+
+          {/* Register Link */}
+          <div className="pt-4 border-t border-slate-800/80 text-center">
+            <p className="text-xs text-slate-400">
+              New teacher?{" "}
+              <Link
+                href="/register"
+                className="font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Create an account
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
