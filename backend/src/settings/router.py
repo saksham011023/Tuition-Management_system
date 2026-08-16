@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import User
+from src.core.config import settings
 from src.core.dependencies import get_current_user, get_db
 from src.settings.repository import SettingsRepository
 from src.settings.schemas import OnboardingWizardPayload, SystemSettingsUpdate, TeacherProfileUpdate
@@ -77,10 +78,10 @@ async def trigger_backup(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Trigger an immediate SQLite database backup."""
+    """Trigger an immediate database backup."""
     service = SettingsService(db)
     try:
-        backup_path = service.trigger_db_backup()
+        backup_path = await service.trigger_db_backup()
         return {
             "status": "success",
             "message": "Database backup created successfully.",
@@ -98,15 +99,25 @@ async def export_database(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FileResponse:
-    """Download database file export."""
-    db_path = get_db_file_path()
-    if not os.path.exists(db_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Database file not found on host.",
+    """Download database file export (SQLite binary file or PostgreSQL JSON backup)."""
+    if "sqlite" in settings.DATABASE_URL:
+        db_path = get_db_file_path()
+        if not os.path.exists(db_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Database file not found on host.",
+            )
+        return FileResponse(
+            path=db_path,
+            media_type="application/x-sqlite3",
+            filename="tms_database_export.db",
         )
-    return FileResponse(
-        path=db_path,
-        media_type="application/x-sqlite3",
-        filename="tms_database_export.db",
-    )
+    else:
+        from src.data_management.backup_service import BackupService
+        backup_service = BackupService()
+        result = await backup_service.create_backup(db, performed_by=current_user.email)
+        return FileResponse(
+            path=result["filepath"],
+            media_type="application/json",
+            filename=result["filename"],
+        )

@@ -106,36 +106,36 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables verified/created successfully")
 
-    # Ensure SQLite users table columns exist
-    try:
-        from sqlalchemy import text
-        async with engine.begin() as conn:
-            res = await conn.execute(text("PRAGMA table_info(users)"))
-            cols = [r[1] for r in res.fetchall()]
-            if "is_onboarded" not in cols:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN is_onboarded BOOLEAN DEFAULT 0 NOT NULL"))
-            if "phone" not in cols:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(20)"))
-            if "profile_image" not in cols:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(500)"))
-            if "signature_image" not in cols:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN signature_image VARCHAR(500)"))
-    except Exception as e:
-        logger.warning("Auto migration check (users): %s", e)
-
-    # Ensure is_demo columns exist (added in this release)
-    try:
-        from sqlalchemy import text
-        async with engine.begin() as conn:
-            for table in ("students", "payments", "attendance", "test_scores"):
-                res = await conn.execute(text(f"PRAGMA table_info({table})"))
+    # Ensure SQLite users and demo table columns exist (local SQLite dev only)
+    if "sqlite" in settings.DATABASE_URL:
+        try:
+            from sqlalchemy import text
+            async with engine.begin() as conn:
+                res = await conn.execute(text("PRAGMA table_info(users)"))
                 cols = [r[1] for r in res.fetchall()]
-                if "is_demo" not in cols:
-                    await conn.execute(
-                        text(f"ALTER TABLE {table} ADD COLUMN is_demo BOOLEAN DEFAULT 0 NOT NULL")
-                    )
-    except Exception as e:
-        logger.warning("Auto migration check (is_demo): %s", e)
+                if "is_onboarded" not in cols:
+                    await conn.execute(text("ALTER TABLE users ADD COLUMN is_onboarded BOOLEAN DEFAULT 0 NOT NULL"))
+                if "phone" not in cols:
+                    await conn.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(20)"))
+                if "profile_image" not in cols:
+                    await conn.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(500)"))
+                if "signature_image" not in cols:
+                    await conn.execute(text("ALTER TABLE users ADD COLUMN signature_image VARCHAR(500)"))
+        except Exception as e:
+            logger.warning("Auto migration check (users): %s", e)
+
+        try:
+            from sqlalchemy import text
+            async with engine.begin() as conn:
+                for table in ("students", "payments", "attendance", "test_scores"):
+                    res = await conn.execute(text(f"PRAGMA table_info({table})"))
+                    cols = [r[1] for r in res.fetchall()]
+                    if "is_demo" not in cols:
+                        await conn.execute(
+                            text(f"ALTER TABLE {table} ADD COLUMN is_demo BOOLEAN DEFAULT 0 NOT NULL")
+                        )
+        except Exception as e:
+            logger.warning("Auto migration check (is_demo): %s", e)
 
     # Seed default message templates
     try:

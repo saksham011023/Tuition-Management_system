@@ -3,6 +3,7 @@ Application configuration using Pydantic BaseSettings.
 All environment variables are centralized here.
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,7 +27,56 @@ class Settings(BaseSettings):
     BACKUP_DIR: str = "./backups"
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/tms_db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./tms.db"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str | None) -> str:
+        """
+        Normalize PostgreSQL connection URL to use asyncpg driver.
+
+        Handles:
+        - postgres:// → postgresql+asyncpg://
+        - postgresql:// → postgresql+asyncpg://
+        - postgresql+psycopg2:// → postgresql+asyncpg://
+        - Strips psycopg2-style params (sslmode, channel_binding) incompatible with asyncpg
+        - Adds ssl=require when SSL was requested
+        """
+        if not v:
+            return "sqlite+aiosqlite:///./tms.db"
+
+        # Skip SQLite — no changes needed
+        if "sqlite" in v:
+            return v
+
+        from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+        # Normalize scheme
+        for old, new in [
+            ("postgresql+psycopg2://", "postgresql+asyncpg://"),
+            ("postgresql://", "postgresql+asyncpg://"),
+            ("postgres://", "postgresql+asyncpg://"),
+        ]:
+            if v.startswith(old):
+                v = v.replace(old, "postgresql+asyncpg://", 1)
+                break
+
+        # Parse the URL to fix query params
+        parsed = urlparse(v)
+        query_params = parse_qs(parsed.query, keep_blank_values=True)
+
+        # Check if SSL was requested via psycopg2-style param
+        ssl_requested = query_params.pop("sslmode", [None])[0] in ("require", "verify-ca", "verify-full")
+        # Remove channel_binding — asyncpg does not support it
+        query_params.pop("channel_binding", None)
+
+        # asyncpg uses ?ssl=require (not sslmode)
+        if ssl_requested:
+            query_params["ssl"] = ["require"]
+
+        new_query = urlencode(query_params, doseq=True)
+        normalized = urlunparse(parsed._replace(query=new_query))
+        return normalized
 
     # JWT
     JWT_SECRET_KEY: str = "your-super-secret-key-change-in-production"
@@ -40,6 +90,18 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+
+    @field_validator("PORT", mode="before")
+    @classmethod
+    def validate_port(cls, v: object) -> int:
+        """Ensure PORT is parsed as an integer, defaulting to 8000 if invalid."""
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            v_str = v.strip()
+            if v_str.isdigit():
+                return int(v_str)
+        return 8000
 
     # Development / Demo Data
     # Set SEED_DEMO_DATA=true in .env to auto-seed on startup (dev only)
