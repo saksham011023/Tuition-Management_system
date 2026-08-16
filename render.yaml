@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: tms-frontend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://tms-backend.onrender.com/api
+    routes:
+      - path: /
+        type: static
+    # Free tier only allows 1 GB RAM, which is enough for this app.
