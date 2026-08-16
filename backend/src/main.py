@@ -178,7 +178,7 @@ app = FastAPI(
     redoc_url="/redoc",
     contact={
         "name": "TMS Support",
-        "email": "support@tms.local",
+        "email": "support@tms.com",
     },
     license_info={
         "name": "Private — All rights reserved",
