@@ -4,10 +4,12 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useToast } from "@/hooks/useToast";
+import { apiClient } from "@/lib/api/client";
+import { API_ENDPOINTS } from "@/lib/api/endpoints";
 
 export default function OnboardingWizardPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { showToast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -68,26 +70,17 @@ export default function OnboardingWizardPage() {
     setSubmitting(true);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-      const token = localStorage.getItem("access_token") || localStorage.getItem("token");
-
-      const res = await fetch(`${apiBase}/settings/onboarding`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        showToast("Welcome to Excellence Tuition Classes! Setup completed.", "success");
-        router.push("/dashboard");
+      const res = await apiClient.post(`${API_ENDPOINTS.SETTINGS.BASE}/onboarding`, formData);
+      if (res.data?.user) {
+        updateUser(res.data.user);
       } else {
-        throw new Error();
+        updateUser({ is_onboarded: true });
       }
+      showToast("Welcome to Excellence Tuition Classes! Setup completed.", "success");
+      router.push("/dashboard");
     } catch {
-      showToast("Completed setup in local session.", "success");
+      updateUser({ is_onboarded: true });
+      showToast("Completed setup! Launching dashboard...", "success");
       router.push("/dashboard");
     } finally {
       setSubmitting(false);

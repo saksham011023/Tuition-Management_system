@@ -14,6 +14,8 @@ interface AuthContextType {
   login: (credentials: LoginInput) => Promise<void>;
   register: (data: RegisterInput) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
+  updateUser: (data: Partial<UserProfile>) => void;
   isAuthenticated: boolean;
 }
 
@@ -24,6 +26,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { showToast } = useToast();
+
+  const refreshUser = async () => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      try {
+        const res = await apiClient.get<UserProfile>(API_ENDPOINTS.AUTH.ME);
+        setUser(res.data);
+      } catch (error) {
+        console.error("Failed to load user info:", error);
+      }
+    }
+  };
+
+  const updateUser = (data: Partial<UserProfile>) => {
+    setUser((prev) => (prev ? { ...prev, ...data } : null));
+  };
 
   useEffect(() => {
     async function loadUser() {
@@ -118,6 +136,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        refreshUser,
+        updateUser,
         isAuthenticated: !!user,
       }}
     >
