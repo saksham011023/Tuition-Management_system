@@ -59,7 +59,7 @@ class FeeRepository:
             .options(selectinload(FeeRecord.transactions))
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     # ──────────────────────────────────────────
     # Paginated List and Search
