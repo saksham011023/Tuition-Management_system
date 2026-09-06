@@ -2,6 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
+import {
+  generateFeeReminderMessage,
+  openWhatsApp,
+} from "@/lib/notifications/notification-service";
 
 /* ──────────────────────────────────────────────
    Types
@@ -18,6 +22,8 @@ interface PendingFee {
   balance: number;
   due_date: string;
   days_overdue: number;
+  parent_name?: string;
+  parent_mobile?: string;
 }
 
 interface PendingFeesTableProps {
@@ -44,6 +50,30 @@ function formatMonth(monthStr: string): string {
    ────────────────────────────────────────────── */
 
 export default function PendingFeesTable({ items, onRecordPayment }: PendingFeesTableProps) {
+  const handleSendWhatsApp = (item: PendingFee) => {
+    const message = generateFeeReminderMessage({
+      studentId: item.student_id,
+      studentName: item.student_name,
+      parentName: item.parent_name || "Parent",
+      parentMobile: item.parent_mobile || "",
+      amount: item.balance,
+      month: item.month,
+      dueDate: item.due_date,
+      daysOverdue: item.days_overdue,
+    });
+
+    if (item.parent_mobile) {
+      openWhatsApp(item.parent_mobile, message);
+    } else {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        navigator.clipboard.writeText(message);
+      }
+      alert(
+        `No parent mobile number saved for ${item.student_name}. The reminder message has been copied to your clipboard!`
+      );
+    }
+  };
+
   return (
     <div
       className="rounded-xl border overflow-hidden"
@@ -114,6 +144,14 @@ export default function PendingFeesTable({ items, onRecordPayment }: PendingFees
                     >
                       Timeline
                     </Link>
+                    <button
+                      onClick={() => handleSendWhatsApp(item)}
+                      className="text-xs font-bold px-2.5 py-1.5 rounded text-white cursor-pointer inline-flex items-center gap-1 transition-all hover:scale-105"
+                      style={{ background: "#25D366" }}
+                      title={`Send WhatsApp fee reminder to ${item.parent_mobile || "parent"}`}
+                    >
+                      💬 Remind
+                    </button>
                     <button
                       onClick={() => onRecordPayment(item)}
                       className="text-xs font-bold px-2.5 py-1.5 rounded text-white cursor-pointer"

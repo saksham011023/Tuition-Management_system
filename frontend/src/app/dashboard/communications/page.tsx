@@ -253,6 +253,9 @@ export default function CommunicationsPage() {
           balance: `₹${fee.balance.toLocaleString("en-IN")}`,
         })
       : customMessage;
+    if (fee.parent_mobile) {
+      openWhatsApp(fee.parent_mobile, message);
+    }
     await copyToClipboard(message);
     setBulkCopied(fee.id);
     setTimeout(() => setBulkCopied(null), 3000);

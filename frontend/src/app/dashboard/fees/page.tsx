@@ -21,6 +21,8 @@ interface PendingFee {
   balance: number;
   due_date: string;
   days_overdue: number;
+  parent_name?: string;
+  parent_mobile?: string;
 }
 
 interface ModeBreakdown {
