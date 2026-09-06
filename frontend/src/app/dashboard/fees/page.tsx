@@ -136,13 +136,15 @@ export default function FeesDashboardPage() {
         );
         fetchFeesData();
       } else {
-        throw new Error();
+        const errData = await res.json().catch(() => null);
+        const detail = errData?.detail || `Server returned status code ${res.status}`;
+        setGenStatus(`Error: ${detail}`);
       }
     } catch {
-      setGenStatus("Offline Error: Monthly fee generation requires an active backend server connection.");
+      setGenStatus("Offline Error: Could not connect to backend server. Please verify your server is running.");
     } finally {
       setGenerating(false);
-      setTimeout(() => setGenStatus(null), 5000);
+      setTimeout(() => setGenStatus(null), 6000);
     }
   };
 
