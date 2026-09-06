@@ -340,10 +340,50 @@ class ValidationService:
         return normalized
 
     def _parse_date(self, date_str: str) -> datetime | None:
-        """Try multiple date formats; return parsed datetime or None."""
-        for fmt in DATE_FORMATS:
+        """Try multiple date formats including timestamps with microseconds or ISO strings."""
+        if not date_str or not str(date_str).strip():
+            return None
+
+        s = str(date_str).strip()
+
+        # Try native ISO format (handles '2026-08-09 09:55:29.495000', '2026-08-09T09:55:29', etc.)
+        try:
+            return datetime.fromisoformat(s)
+        except ValueError:
+            pass
+
+        formats = [
+            "%Y-%m-%d %H:%M:%S.%f",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d",
+            "%d/%m/%Y %H:%M:%S.%f",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y",
+            "%d-%m-%Y %H:%M:%S.%f",
+            "%d-%m-%Y %H:%M:%S",
+            "%d-%m-%Y",
+            "%m/%d/%Y %H:%M:%S.%f",
+            "%m/%d/%Y %H:%M:%S",
+            "%m/%d/%Y",
+            "%m-%d-%Y %H:%M:%S.%f",
+            "%m-%d-%Y %H:%M:%S",
+            "%m-%d-%Y",
+        ]
+        for fmt in formats:
             try:
-                return datetime.strptime(date_str.strip(), fmt)
+                return datetime.strptime(s, fmt)
             except ValueError:
                 continue
+
+        # Try extracting just the date component (first token before space)
+        if " " in s:
+            date_part = s.split()[0]
+            for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y"]:
+                try:
+                    return datetime.strptime(date_part, fmt)
+                except ValueError:
+                    continue
+
         return None

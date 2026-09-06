@@ -347,37 +347,11 @@ class ImportService:
         return None
 
     def _parse_joining_date(self, date_str: str) -> date | None:
-        """Parse a date string using multiple formats."""
-        if not date_str or not date_str.strip():
+        """Parse a date string using validator formats and return date object."""
+        if not date_str or not str(date_str).strip():
             return None
 
-        formats = [
-            "%Y-%m-%d",
-            "%d/%m/%Y",
-            "%d-%m-%Y",
-            "%m/%d/%Y",
-            "%m-%d-%Y",
-            "%d-%m-%Y %H:%M:%S",
-            "%m-%d-%Y %H:%M:%S",
-            "%d/%m/%Y %H:%M:%S",
-            "%m/%d/%Y %H:%M:%S",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%dT%H:%M:%S",
-        ]
-        s = date_str.strip()
-        for fmt in formats:
-            try:
-                return datetime.strptime(s, fmt).date()
-            except ValueError:
-                continue
-
-        # Try extract date prefix if timestamp has space
-        if " " in s:
-            part = s.split()[0]
-            for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y"]:
-                try:
-                    return datetime.strptime(part, fmt).date()
-                except ValueError:
-                    continue
-
+        parsed = self.validator._parse_date(date_str)
+        if parsed is not None:
+            return parsed.date()
         return None

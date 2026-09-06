@@ -38,6 +38,24 @@ def test_google_form_row_normalization():
     assert data["address"] == "Chanod Colony Vapi"
 
 
+def test_microsecond_timestamp_parsing():
+    """Test that timestamps with microseconds like 2026-08-09 09:55:29.495000 parse validly."""
+    service = ValidationService()
+    row = {
+        "Timestamp": "2026-08-09 09:55:29.495000",
+        "Student's Name": "Tisha Patel",
+        "Parent's Name": "Chhaya Patel",
+        "Parent's Mobile Number": "7574014293",
+        "Class/Grade": "10",
+        "School Name": "St Mary's school",
+        "Monthly Tuition Fee": "1200",
+        "Batch 1/2": "Batch 1 (3-5)",
+    }
+    res = service.validate_student_row(row)
+    assert res.is_valid is True
+    assert len(res.errors) == 0
+
+
 def test_batch_resolution():
     """Test smart batch resolution matching Google Sheet strings to DB batches."""
     service = ImportService()
