@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "https://tms-backend0.onrender.com/api",
+  },
   // Enable standalone output for optimized Docker images.
   // Only copies the minimal files needed to run the server.
   output: "standalone",

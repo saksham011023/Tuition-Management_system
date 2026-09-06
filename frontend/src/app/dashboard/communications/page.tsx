@@ -9,8 +9,9 @@ import {
   logNotification,
   formatMonth,
 } from "@/lib/notifications/notification-service";
+import { getApiBaseUrl } from "@/lib/api/client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE = getApiBaseUrl();
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
