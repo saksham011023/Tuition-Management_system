@@ -326,6 +326,8 @@ class FeeService:
                     paid_amount=paid_amount,
                     balance=balance,
                     days_overdue=days_overdue,
+                    parent_name=r.student.parent_name if r.student else None,
+                    parent_mobile=r.student.parent_mobile if r.student else None,
                 )
             )
 

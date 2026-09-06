@@ -90,6 +90,12 @@ class Settings(BaseSettings):
         "https://tms-frontend-asde.onrender.com",
     ]
 
+    # WhatsApp / Meta Cloud API
+    WHATSAPP_PROVIDER: str = "auto"  # meta | click_to_chat | auto
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+    WHATSAPP_ACCESS_TOKEN: str = ""
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
+
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000

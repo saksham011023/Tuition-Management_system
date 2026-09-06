@@ -165,6 +165,8 @@ class PendingFeeItem(BaseModel):
     paid_amount: float
     balance: float
     days_overdue: int
+    parent_name: str | None = None
+    parent_mobile: str | None = None
 
 
 class ModeBreakdown(BaseModel):

@@ -92,6 +92,40 @@ async def create_notification(
     )
 
 
+from pydantic import BaseModel
+
+
+class SendWhatsAppDirectRequest(BaseModel):
+    phone: str
+    message: str
+    student_id: str | None = None
+    student_name: str | None = None
+    parent_name: str | None = None
+    notification_type: str = "fee_reminder"
+
+
+@router.post(
+    "/send-whatsapp",
+    summary="Send WhatsApp message directly",
+    description="Sends WhatsApp message automatically via Meta Cloud API if configured, or returns 1-click wa.me URL.",
+)
+async def send_whatsapp_direct(
+    data: SendWhatsAppDirectRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send WhatsApp message automatically or via 1-click URL."""
+    service = NotificationService(db)
+    return await service.send_whatsapp_message(
+        phone=data.phone,
+        message=data.message,
+        student_id=data.student_id,
+        student_name=data.student_name,
+        parent_name=data.parent_name,
+        notification_type=data.notification_type,
+    )
+
+
 @router.get(
     "/templates",
     response_model=list[MessageTemplateResponse],

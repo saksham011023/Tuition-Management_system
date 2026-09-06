@@ -48,6 +48,8 @@ interface PendingFee {
   balance: number;
   due_date: string;
   days_overdue: number;
+  parent_name?: string;
+  parent_mobile?: string;
 }
 
 interface Analytics {
@@ -171,21 +173,68 @@ export default function CommunicationsPage() {
     if (activeTab === "reminders" || activeTab === "bulk") fetchPendingFees();
   }, [activeTab, fetchPendingFees]);
 
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
+
   const handleSendReminder = async (fee: PendingFee, reminderType: "upcoming" | "overdue") => {
+    const key = fee.id + reminderType;
+    setSendingReminder(key);
     const message = generateFeeReminderMessage({
       studentId: fee.student_id,
       studentName: fee.student_name,
-      parentName: "Parent",
-      parentMobile: "",
+      parentName: fee.parent_name || "Parent",
+      parentMobile: fee.parent_mobile || "",
       amount: fee.balance,
       month: fee.month,
       dueDate: fee.due_date,
       daysOverdue: reminderType === "overdue" ? fee.days_overdue : 0,
     });
-    // We don't have parent mobile in PendingFeeItem — show copy fallback
-    await copyToClipboard(message);
-    setSentReminders((prev) => new Set([...prev, fee.id + reminderType]));
-    setTimeout(() => setSentReminders((prev) => { const n = new Set(prev); n.delete(fee.id + reminderType); return n; }), 4000);
+
+    try {
+      const res = await fetch(`${API_BASE}/notifications/send-whatsapp`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          phone: fee.parent_mobile || "",
+          message,
+          student_id: fee.student_id,
+          student_name: fee.student_name,
+          parent_name: fee.parent_name || "Parent",
+          notification_type: "fee_reminder",
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.channel === "meta_api" && data.success) {
+          // Sent silently in background via Meta API!
+          setSentReminders((prev) => new Set([...prev, key]));
+          fetchAnalytics();
+          setTimeout(() => setSentReminders((prev) => { const n = new Set(prev); n.delete(key); return n; }), 4000);
+          return;
+        }
+        if (data.wa_url && fee.parent_mobile) {
+          window.open(data.wa_url, "_blank");
+        } else {
+          await copyToClipboard(message);
+        }
+      } else {
+        if (fee.parent_mobile) {
+          openWhatsApp(fee.parent_mobile, message);
+        } else {
+          await copyToClipboard(message);
+        }
+      }
+    } catch {
+      if (fee.parent_mobile) {
+        openWhatsApp(fee.parent_mobile, message);
+      } else {
+        await copyToClipboard(message);
+      }
+    } finally {
+      setSendingReminder(null);
+      setSentReminders((prev) => new Set([...prev, key]));
+      setTimeout(() => setSentReminders((prev) => { const n = new Set(prev); n.delete(key); return n; }), 4000);
+    }
   };
 
   const handleBulkWhatsApp = async (fee: PendingFee) => {
@@ -460,19 +509,29 @@ export default function CommunicationsPage() {
                       <div className="flex gap-2 flex-shrink-0">
                         {fee.days_overdue > 0 ? (
                           <button
+                            disabled={sendingReminder === fee.id + "overdue"}
                             onClick={() => handleSendReminder(fee, "overdue")}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer hover:scale-[1.02] transition-all"
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer hover:scale-[1.02] transition-all disabled:opacity-50"
                             style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}
                           >
-                            {sentReminders.has(fee.id + "overdue") ? "✓ Copied!" : "⚠️ Overdue Reminder"}
+                            {sendingReminder === fee.id + "overdue"
+                              ? "⏳ Sending..."
+                              : sentReminders.has(fee.id + "overdue")
+                              ? "✓ Sent / Copied!"
+                              : "⚠️ Overdue Reminder"}
                           </button>
                         ) : (
                           <button
+                            disabled={sendingReminder === fee.id + "upcoming"}
                             onClick={() => handleSendReminder(fee, "upcoming")}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer hover:scale-[1.02] transition-all"
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white cursor-pointer hover:scale-[1.02] transition-all disabled:opacity-50"
                             style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
                           >
-                            {sentReminders.has(fee.id + "upcoming") ? "✓ Copied!" : "📅 Send Reminder"}
+                            {sendingReminder === fee.id + "upcoming"
+                              ? "⏳ Sending..."
+                              : sentReminders.has(fee.id + "upcoming")
+                              ? "✓ Sent / Copied!"
+                              : "📅 Send Reminder"}
                           </button>
                         )}
                       </div>

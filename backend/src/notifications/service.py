@@ -53,11 +53,69 @@ class WhatsAppClickToChat(NotificationProvider):
         encoded_msg = quote(message)
         return f"{self.BASE_URL}{digits}?text={encoded_msg}"
 
-    async def send_sms(self, phone: str, message: str) -> bool:
-        return False
+class MetaWhatsAppProvider(NotificationProvider):
+    """
+    Meta WhatsApp Cloud API Provider.
+    Sends messages directly from the server to WhatsApp without opening the user's WhatsApp client.
+    """
 
-    async def send_email(self, email: str, subject: str, body: str) -> bool:
-        return False
+    def __init__(self, phone_number_id: str | None = None, access_token: str | None = None) -> None:
+        from src.core.config import settings
+        self.phone_number_id = phone_number_id or settings.WHATSAPP_PHONE_NUMBER_ID
+        self.access_token = access_token or settings.WHATSAPP_ACCESS_TOKEN
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.phone_number_id and self.access_token)
+
+    async def send_whatsapp(self, phone: str, message: str) -> dict:
+        """Send message via Meta Graph API."""
+        import asyncio
+        import json
+        import urllib.error
+        import urllib.request
+
+        if not self.is_configured:
+            raise ValueError(
+                "Meta WhatsApp Cloud API credentials (WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN) are not configured."
+            )
+
+        digits = "".join(c for c in phone if c.isdigit())
+        if not digits.startswith("91") and len(digits) == 10:
+            digits = "91" + digits
+
+        url = f"https://graph.facebook.com/v20.0/{self.phone_number_id}/messages"
+        payload = json.dumps({
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": digits,
+            "type": "text",
+            "text": {
+                "preview_url": False,
+                "body": message
+            }
+        }).encode("utf-8")
+
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json"
+        }
+
+        def _do_request():
+            req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                err_body = e.read().decode("utf-8")
+                try:
+                    err_json = json.loads(err_body)
+                    msg = err_json.get("error", {}).get("message", err_body)
+                except Exception:
+                    msg = err_body
+                raise RuntimeError(f"Meta WhatsApp API error ({e.code}): {msg}") from e
+
+        return await asyncio.to_thread(_do_request)
 
 
 # ──────────────────────────────────────────────
@@ -73,7 +131,66 @@ class NotificationService:
     def __init__(self, db: AsyncSession, provider: NotificationProvider | None = None) -> None:
         self.db = db
         self.repo = NotificationRepository(db)
-        self.provider: NotificationProvider = provider or WhatsAppClickToChat()
+        if provider:
+            self.provider = provider
+        else:
+            meta = MetaWhatsAppProvider()
+            self.provider = meta if meta.is_configured else WhatsAppClickToChat()
+
+    async def send_whatsapp_message(
+        self,
+        phone: str,
+        message: str,
+        student_id: str | None = None,
+        student_name: str | None = None,
+        parent_name: str | None = None,
+        notification_type: str = "fee_reminder",
+    ) -> dict:
+        """
+        Send a WhatsApp message.
+        If Meta WhatsApp Cloud API credentials are configured, sends directly in background.
+        If not configured, generates and returns the wa.me click-to-chat URL.
+        """
+        meta = MetaWhatsAppProvider()
+        if meta.is_configured:
+            try:
+                res = await meta.send_whatsapp(phone, message)
+                msg_id = res.get("messages", [{}])[0].get("id")
+                await self.record_notification(
+                    student_id=student_id or "system",
+                    student_name=student_name or "Student",
+                    parent_name=parent_name or "Parent",
+                    parent_mobile=phone,
+                    notification_type=notification_type,
+                    message=message,
+                    channel="whatsapp",
+                    status="sent",
+                    metadata_={"meta_message_id": msg_id, "provider": "meta_api"}
+                )
+                await self.db.commit()
+                return {
+                    "success": True,
+                    "channel": "meta_api",
+                    "message_id": msg_id,
+                    "detail": "WhatsApp message sent automatically via Meta Cloud API!",
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "channel": "meta_api",
+                    "detail": f"Failed to send via Meta API: {str(e)}",
+                    "wa_url": await WhatsAppClickToChat().send_whatsapp(phone, message),
+                }
+
+        # Fallback to Click-to-Chat
+        click_provider = WhatsAppClickToChat()
+        wa_url = await click_provider.send_whatsapp(phone, message)
+        return {
+            "success": True,
+            "channel": "click_to_chat",
+            "wa_url": wa_url,
+            "detail": "Meta API credentials not set. Generated 1-Click WhatsApp link.",
+        }
 
     # ──────────────────────────────────────────
     # Core: generate content
