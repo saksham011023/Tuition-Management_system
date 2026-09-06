@@ -85,7 +85,10 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "https://tms-frontend-asde.onrender.com",
+    ]
 
     # Server
     HOST: str = "0.0.0.0"
