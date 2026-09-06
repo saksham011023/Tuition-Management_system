@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api/client";
 import CollectionReport from "@/components/fees/collection-report";
 import PendingFeesTable from "@/components/fees/pending-fees-table";
 
@@ -54,19 +55,6 @@ const INITIAL_REPORT: MonthlyReport = {
   },
 };
 
-const MOCK_PENDING: PendingFee[] = [];
-
-/* ──────────────────────────────────────────────
-   Helpers
-   ────────────────────────────────────────────── */
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-
-function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  return token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
-}
-
 /* ──────────────────────────────────────────────
    Component
    ────────────────────────────────────────────── */
@@ -87,28 +75,17 @@ export default function FeesDashboardPage() {
     setLoading(true);
     try {
       // Fetch report
-      const repRes = await fetch(`${API_BASE}/fees/report/${month}`, { headers: getAuthHeaders() });
-      if (repRes.ok) {
-        const repData = await repRes.json();
-        setReport(repData);
-      } else {
-        setReport(INITIAL_REPORT);
-      }
+      const repRes = await apiClient.get(`/fees/report/${month}`);
+      setReport(repRes.data);
 
       // Fetch pending list
-      const query = new URLSearchParams();
-      if (search) query.append("search", search);
-      query.append("month", month);
+      const params: Record<string, string> = { month };
+      if (search) params.search = search;
       
-      const pendRes = await fetch(`${API_BASE}/fees/pending?${query}`, { headers: getAuthHeaders() });
-      if (pendRes.ok) {
-        const pendData = await pendRes.json();
-        setPendingItems(pendData);
-      } else {
-        setPendingItems([]);
-      }
+      const pendRes = await apiClient.get("/fees/pending", { params });
+      setPendingItems(pendRes.data);
     } catch {
-      // Local fallback
+      // Fallback
       setReport(INITIAL_REPORT);
       setPendingItems([]);
     } finally {
@@ -124,24 +101,15 @@ export default function FeesDashboardPage() {
     setGenerating(true);
     setGenStatus("Generating billing records...");
     try {
-      const res = await fetch(`${API_BASE}/fees/generate`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ month }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setGenStatus(
-          `Success: Created ${data.generated_count} fee record(s). Skipped ${data.skipped_count} existing records.`
-        );
-        fetchFeesData();
-      } else {
-        const errData = await res.json().catch(() => null);
-        const detail = errData?.detail || `Server returned status code ${res.status}`;
-        setGenStatus(`Error: ${detail}`);
-      }
-    } catch {
-      setGenStatus("Offline Error: Could not connect to backend server. Please verify your server is running.");
+      const res = await apiClient.post("/fees/generate", { month });
+      const data = res.data;
+      setGenStatus(
+        `Success: Created ${data.generated_count} fee record(s). Skipped ${data.skipped_count} existing records.`
+      );
+      fetchFeesData();
+    } catch (err: any) {
+      const errMsg = err.response?.data?.detail || err.message || "Failed to generate monthly fee records.";
+      setGenStatus(`Error: ${errMsg}`);
     } finally {
       setGenerating(false);
       setTimeout(() => setGenStatus(null), 6000);
