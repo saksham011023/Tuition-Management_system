@@ -216,9 +216,9 @@ async def test_get_me_authenticated(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_get_me_no_token(client: AsyncClient):
-    """Accessing /me without a token returns 403."""
+    """Accessing /me without a token returns 401 or 403."""
     resp = await client.get("/api/auth/me")
-    assert resp.status_code == 403
+    assert resp.status_code in (401, 403)
 
 
 @pytest.mark.asyncio

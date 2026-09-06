@@ -263,8 +263,10 @@ app.include_router(notifications_router, prefix="/api/notifications", tags=["Not
 app.include_router(reports_router, prefix="/api/reports", tags=["Reports"])
 app.include_router(search_router, prefix="/api/search", tags=["Search"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
-app.include_router(data_management_router, prefix="/api/data", tags=["Data Management"])
-app.include_router(activity_log_router, prefix="/api/activity-log", tags=["Activity Log"])
+app.include_router(data_management_router, prefix="/api/data-management", tags=["Data Management"])
+app.include_router(data_management_router, prefix="/api/data", tags=["Data Management"], include_in_schema=False)
+app.include_router(activity_log_router, prefix="/api/activity-logs", tags=["Activity Log"])
+app.include_router(activity_log_router, prefix="/api/activity-log", tags=["Activity Log"], include_in_schema=False)
 
 
 

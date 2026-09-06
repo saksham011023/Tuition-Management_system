@@ -17,22 +17,30 @@ from src.data_management.schemas import (
     ValidationResult,
 )
 
-# Required columns for import
+# Required core columns for import
 REQUIRED_FIELDS = [
     "student_name",
     "parent_name",
     "parent_mobile",
     "class",
-    "school",
-    "subjects",
-    "batch",
-    "monthly_fee",
-    "joining_date",
-    "address",
 ]
 
 PHONE_RE = re.compile(r"^\+?[0-9]{10,15}$")
-DATE_FORMATS = ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"]
+DATE_FORMATS = [
+    "%Y-%m-%d",
+    "%d/%m/%Y",
+    "%d-%m-%Y",
+    "%m/%d/%Y",
+    "%m-%d-%Y",
+    "%d-%m-%Y %H:%M:%S",
+    "%m-%d-%Y %H:%M:%S",
+    "%d/%m/%Y %H:%M:%S",
+    "%m/%d/%Y %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S",
+]
+
+DEFAULT_ADDRESS = "Chanod Colony Vapi"
 
 
 class ValidationService:
@@ -78,7 +86,7 @@ class ValidationService:
             if parsed_date is None:
                 errors.append(
                     f"Invalid joining_date format: '{joining_raw}'. "
-                    "Accepted formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY"
+                    "Accepted formats: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, or timestamp"
                 )
 
         # --- Name length ---
@@ -184,50 +192,150 @@ class ValidationService:
 
     def _normalize_keys(self, row: dict) -> dict:
         """
-        Normalize column headers to canonical snake_case names.
-        Handles common variations from Excel/CSV exports.
+        Normalize column headers to canonical snake_case names and clean values.
+        Handles common variations from Excel/CSV Google Form exports.
         """
         ALIASES: dict[str, str] = {
+            "student_name": "student_name",
             "student name": "student_name",
             "studentname": "student_name",
+            "students name": "student_name",
+            "student s name": "student_name",
             "name": "student_name",
+            "full name": "student_name",
+            "student": "student_name",
+            
+            "parent_name": "parent_name",
             "parent name": "parent_name",
             "parentname": "parent_name",
+            "parents name": "parent_name",
+            "parent s name": "parent_name",
             "father name": "parent_name",
+            "fathers name": "parent_name",
             "guardian name": "parent_name",
+            
+            "parent_mobile": "parent_mobile",
             "parent mobile": "parent_mobile",
+            "parentmobile": "parent_mobile",
+            "parents mobile": "parent_mobile",
+            "parent s mobile": "parent_mobile",
+            "parent mobile number": "parent_mobile",
+            "parents mobile number": "parent_mobile",
+            "parent s mobile number": "parent_mobile",
             "phone": "parent_mobile",
             "mobile": "parent_mobile",
             "contact": "parent_mobile",
+            "contact number": "parent_mobile",
+            "mobile number": "parent_mobile",
+            "phone number": "parent_mobile",
+            
+            "alternate_mobile": "alternate_mobile",
             "alternate mobile": "alternate_mobile",
             "alt mobile": "alternate_mobile",
             "alt phone": "alternate_mobile",
+            "alternate mobile number": "alternate_mobile",
+            
             "class": "class",
             "grade": "class",
+            "class grade": "class",
+            "class/grade": "class",
             "class name": "class",
+            "standard": "class",
+            "std": "class",
+            
             "school": "school",
             "school name": "school",
+            "school_name": "school",
+            
             "subjects": "subjects",
             "subject": "subjects",
+            "subjects taught": "subjects",
+            
             "batch": "batch",
             "batch name": "batch",
+            "batch 1/2": "batch",
+            "batch 1 2": "batch",
+            "batch 1 / 2": "batch",
+            "select batch": "batch",
+            
+            "monthly_fee": "monthly_fee",
             "monthly fee": "monthly_fee",
+            "monthly tuition fee": "monthly_fee",
+            "tuition fee": "monthly_fee",
             "fee": "monthly_fee",
             "fees": "monthly_fee",
             "monthlyfee": "monthly_fee",
+            
+            "joining_date": "joining_date",
             "joining date": "joining_date",
             "joiningdate": "joining_date",
             "date of joining": "joining_date",
+            "timestamp": "joining_date",
+            "time stamp": "joining_date",
+            "date": "joining_date",
+            
             "address": "address",
+            "residential address": "address",
+            "home address": "address",
+            
             "notes": "notes",
             "remarks": "notes",
+            "comment": "notes",
+            "comments": "notes",
         }
 
         normalized: dict = {}
         for key, val in row.items():
-            lookup = str(key).strip().lower()
-            canonical = ALIASES.get(lookup, lookup)
+            raw_key = str(key).strip().lower()
+            # Clean special characters in key for fuzzy matching
+            cleaned_key = re.sub(r"[^\w\s]", " ", raw_key)
+            cleaned_key = re.sub(r"\s+", " ", cleaned_key).strip()
+
+            canonical = ALIASES.get(raw_key, ALIASES.get(cleaned_key, raw_key))
             normalized[canonical] = val
+
+        # Clean phone number (strip .0, spaces, dashes)
+        if "parent_mobile" in normalized and normalized["parent_mobile"] is not None:
+            pm = str(normalized["parent_mobile"]).strip()
+            if pm.endswith(".0"):
+                pm = pm[:-2]
+            pm = re.sub(r"[\s\-\(\)]", "", pm)
+            normalized["parent_mobile"] = pm
+
+        if "alternate_mobile" in normalized and normalized["alternate_mobile"] is not None:
+            am = str(normalized["alternate_mobile"]).strip()
+            if am.endswith(".0"):
+                am = am[:-2]
+            am = re.sub(r"[\s\-\(\)]", "", am)
+            normalized["alternate_mobile"] = am
+
+        # Clean monthly fee (strip ₹, commas)
+        if "monthly_fee" in normalized and normalized["monthly_fee"] is not None:
+            mf = str(normalized["monthly_fee"]).strip()
+            mf = re.sub(r"[^\d\.]", "", mf)
+            normalized["monthly_fee"] = mf if mf else "0"
+
+        # Clean class (e.g., '9' -> 'Class 9')
+        if "class" in normalized and normalized["class"] is not None:
+            cl = str(normalized["class"]).strip()
+            if cl.isdigit():
+                cl = f"Class {cl}"
+            normalized["class"] = cl
+
+        # Default address if missing or empty
+        addr = str(normalized.get("address", "")).strip()
+        if not addr:
+            normalized["address"] = DEFAULT_ADDRESS
+
+        # Default school if missing or empty
+        sch = str(normalized.get("school", "")).strip()
+        if not sch:
+            normalized["school"] = "Not provided"
+
+        # Default subjects if missing or empty
+        sub = str(normalized.get("subjects", "")).strip()
+        if not sub:
+            normalized["subjects"] = "All Subjects"
 
         return normalized
 

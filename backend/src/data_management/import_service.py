@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -237,18 +238,20 @@ class ImportService:
             # Parse subjects (comma-separated string → list)
             subjects_raw = str(normalized.get("subjects", ""))
             subjects = [s.strip() for s in subjects_raw.split(",") if s.strip()]
+            if not subjects:
+                subjects = ["All Subjects"]
 
             # Resolve batch
-            batch_name = str(normalized.get("batch", "")).strip().lower()
-            matched_batch = all_batches.get(batch_name)
+            batch_raw = str(normalized.get("batch", "")).strip()
+            matched_batch = self._resolve_batch(batch_raw, all_batches)
 
             student = Student(
                 name=sname,
                 parent_name=str(normalized.get("parent_name", "")).strip(),
                 parent_mobile=pmobile,
                 alternate_mobile=str(normalized.get("alternate_mobile", "")).strip() or None,
-                address=str(normalized.get("address", "")).strip() or "Not provided",
-                school=str(normalized.get("school", "")).strip(),
+                address=str(normalized.get("address", "")).strip() or "Chanod Colony Vapi",
+                school=str(normalized.get("school", "")).strip() or "Not provided",
                 class_name=sclass,
                 subjects=subjects,
                 joining_date=joining_date,
@@ -309,12 +312,72 @@ class ImportService:
     # Helpers
     # ──────────────────────────────────────────
 
+    def _resolve_batch(self, batch_raw: str, all_batches: dict) -> Any | None:
+        """Smart match batch name from import string to database Batch objects."""
+        if not batch_raw:
+            return None
+
+        raw_lower = batch_raw.strip().lower()
+
+        # Direct exact match
+        if raw_lower in all_batches:
+            return all_batches[raw_lower]
+
+        # Ignore header row artifact like 'batch 1/2' or 'batch 1 / 2'
+        if raw_lower in ("batch 1/2", "batch 1 / 2", "batch 1_2"):
+            return None
+
+        # Check Batch 2 first (e.g. 'Batch 2 (5-7)', 'Batch 2')
+        if re.search(r"\bbatch\s*2\b", raw_lower) or "5-7" in raw_lower or "5 to 7" in raw_lower:
+            for name, b in all_batches.items():
+                if "batch 2" in name:
+                    return b
+
+        # Check Batch 1 (e.g. 'Batch 1 (3-5)', 'Batch 1')
+        if re.search(r"\bbatch\s*1\b", raw_lower) or "3-5" in raw_lower or "3 to 5" in raw_lower:
+            for name, b in all_batches.items():
+                if "batch 1" in name:
+                    return b
+
+        # Partial match
+        for name, b in all_batches.items():
+            if raw_lower in name or name in raw_lower:
+                return b
+
+        return None
+
     def _parse_joining_date(self, date_str: str) -> date | None:
         """Parse a date string using multiple formats."""
-        formats = ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"]
+        if not date_str or not date_str.strip():
+            return None
+
+        formats = [
+            "%Y-%m-%d",
+            "%d/%m/%Y",
+            "%d-%m-%Y",
+            "%m/%d/%Y",
+            "%m-%d-%Y",
+            "%d-%m-%Y %H:%M:%S",
+            "%m-%d-%Y %H:%M:%S",
+            "%d/%m/%Y %H:%M:%S",
+            "%m/%d/%Y %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S",
+        ]
+        s = date_str.strip()
         for fmt in formats:
             try:
-                return datetime.strptime(date_str.strip(), fmt).date()
+                return datetime.strptime(s, fmt).date()
             except ValueError:
                 continue
+
+        # Try extract date prefix if timestamp has space
+        if " " in s:
+            part = s.split()[0]
+            for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y"]:
+                try:
+                    return datetime.strptime(part, fmt).date()
+                except ValueError:
+                    continue
+
         return None
