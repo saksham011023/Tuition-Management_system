@@ -207,6 +207,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https:\/\/.*\.onrender\.com$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -267,6 +268,20 @@ app.include_router(data_management_router, prefix="/api/data-management", tags=[
 app.include_router(data_management_router, prefix="/api/data", tags=["Data Management"], include_in_schema=False)
 app.include_router(activity_log_router, prefix="/api/activity-logs", tags=["Activity Log"])
 app.include_router(activity_log_router, prefix="/api/activity-log", tags=["Activity Log"], include_in_schema=False)
+
+# Direct fallback prefixes (without /api) to ensure compatibility if frontend baseURL misses /api
+app.include_router(fees_router, prefix="/fees", include_in_schema=False)
+app.include_router(auth_router, prefix="/auth", include_in_schema=False)
+app.include_router(users_router, prefix="/users", include_in_schema=False)
+app.include_router(dashboard_router, prefix="/dashboard", include_in_schema=False)
+app.include_router(student_router, prefix="/students", include_in_schema=False)
+app.include_router(batch_router, prefix="/batches", include_in_schema=False)
+app.include_router(attendance_router, prefix="/attendance", include_in_schema=False)
+app.include_router(notifications_router, prefix="/notifications", include_in_schema=False)
+app.include_router(reports_router, prefix="/reports", include_in_schema=False)
+app.include_router(search_router, prefix="/search", include_in_schema=False)
+app.include_router(settings_router, prefix="/settings", include_in_schema=False)
+app.include_router(data_management_router, prefix="/data-management", include_in_schema=False)
 
 
 

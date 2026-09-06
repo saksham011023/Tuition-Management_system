@@ -1,17 +1,36 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+export function getApiBaseUrl(): string {
+  let url = process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") {
+    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (!isLocal && (!url || url.includes("localhost") || url.includes("127.0.0.1"))) {
+      url = "https://tms-backend0.onrender.com/api";
+    }
+  }
+  if (!url) {
+    url = "http://localhost:8000/api";
+  }
+  url = url.trim().replace(/\/+$/, "");
+  if (!url.endsWith("/api")) {
+    url = `${url}/api`;
+  }
+  return url;
+}
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Interceptor to inject JWT access token
+// Interceptor to inject JWT access token and ensure dynamic baseURL
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    config.baseURL = getApiBaseUrl();
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("access_token");
       if (token && config.headers) {
@@ -76,7 +95,7 @@ apiClient.interceptors.response.use(
         }
 
         // Request token refresh using base axios to avoid headers looping
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+        const response = await axios.post(`${getApiBaseUrl()}/auth/refresh`, {
           refresh_token: refreshToken,
         });
 

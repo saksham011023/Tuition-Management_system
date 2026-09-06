@@ -84,7 +84,8 @@ export default function FeesDashboardPage() {
       
       const pendRes = await apiClient.get("/fees/pending", { params });
       setPendingItems(pendRes.data);
-    } catch {
+    } catch (err) {
+      console.error("Failed to fetch fees data:", err);
       // Fallback
       setReport(INITIAL_REPORT);
       setPendingItems([]);
